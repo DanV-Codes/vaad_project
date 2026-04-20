@@ -66,6 +66,17 @@ if __name__ == "__main__":
             print(f"💰 Credit file: {os.path.basename(credit_csv_path)} ({len(credit_df)} rows)")
             print(f"💸 Debit file: {os.path.basename(debit_csv_path)} ({len(debit_df)} rows)")
             
+            # --- שלב ח': עדכון קובץ המאסטר באקסל ---
+
+            # אנחנו הולכים שתי רמות למעלה מתיקיית ה-raw כדי להגיע לשורש הפרויקט
+            project_root = os.path.dirname(os.path.dirname(raw_directory))
+            master_excel_path = os.path.join(project_root, "האגמית7_כספים_2026.xlsx")
+
+            print(f"DEBUG: Looking for master file at: {master_excel_path}") # שורת בדיקה
+
+            from excel_integration import update_master_excel
+            update_master_excel(credit_df, master_excel_path) 
+
         except Exception as e:
             print(f"\n❌ An unexpected error occurred in main pipeline: {e}")
     else:
