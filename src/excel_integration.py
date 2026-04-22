@@ -14,7 +14,6 @@ def show_summary_popup(month_num, updated_count, already_filled_apts, newly_upda
     root.geometry("850x650")
     root.configure(bg="#f4f4f4")
 
-    # פונקציית סגירה הרמטית שמשחררת את הטרמינל ומסיימת את התהליך הגרפי
     def close_app():
         root.quit()
         root.destroy()
@@ -25,13 +24,11 @@ def show_summary_popup(month_num, updated_count, already_filled_apts, newly_upda
     stats_frame = tk.Frame(root, bg="#f4f4f4")
     stats_frame.pack(fill=tk.X, padx=20)
 
-    # נתוני הצלחה
     success_text = f"✅ עודכנו בהצלחה: {updated_count} דירות"
     if newly_updated_apts:
         success_text += f" ({sorted(newly_updated_apts)})"
     tk.Label(stats_frame, text=success_text, font=("Arial", 14), fg="green", bg="#f4f4f4").pack(anchor="e", pady=2)
 
-    # נתוני דילוג (כבר היו מלאות)
     if already_filled_apts:
         tk.Label(stats_frame, text=f"ℹ️ דולגו (כבר שילמו באקסל): {len(already_filled_apts)} דירות ({sorted(already_filled_apts)})", font=("Arial", 14), fg="#b8860b", bg="#f4f4f4").pack(anchor="e", pady=2)
 
@@ -55,7 +52,6 @@ def show_summary_popup(month_num, updated_count, already_filled_apts, newly_upda
 
     text_area.config(state=tk.DISABLED)
 
-    # כפתור סגירה גדול, רחב ובולט
     close_btn = tk.Button(root, text="סגור דוח והמשך", command=close_app, font=("Arial", 14, "bold"), bg="#4CAF50", fg="white", width=20, pady=10)
     close_btn.pack(pady=15)
 
@@ -111,23 +107,21 @@ def update_master_excel(df, master_path):
         target_row = apt_num + 1
         
         current_val = ws.cell(row=target_row, column=target_col).value
-        # המרה לטקסט נקי כדי לוודא שאין בעיות של "30.0" מול "30"
         curr_str = str(current_val).strip() if current_val is not None else ""
         if curr_str.endswith(".0"): curr_str = curr_str[:-2]
 
-        # טיפול מיוחד לדירות 12 ו-40
         if apt_num in [12, 40]:
             if amount == 320:
                 if curr_str == "30":
-                    ws.cell(row=target_row, column=target_col).value = 350 # דורסים ל-350 כדי לסמן תשלום מלא
+                    ws.cell(row=target_row, column=target_col).value = 350 
                     updated_count += 1
                     newly_updated_apts.append(apt_num)
                 elif curr_str == "350":
                     already_filled_apts.append(apt_num)
                 else:
-                    exceptions_idx.append(idx) # שילמו 320 אבל לא היה להם 30 בתא
+                    exceptions_idx.append(idx) 
                     
-            elif amount == 350: # למקרה שהעבירו 350 במקום 320
+            elif amount == 350: 
                 if curr_str == "" or curr_str == "30":
                     ws.cell(row=target_row, column=target_col).value = 350
                     updated_count += 1
@@ -139,7 +133,6 @@ def update_master_excel(df, master_path):
             else:
                 exceptions_idx.append(idx)
 
-        # טיפול רגיל לשאר הדירות
         else:
             if amount == 350:
                 if curr_str == "":
@@ -149,13 +142,41 @@ def update_master_excel(df, master_path):
                 elif curr_str == "350":
                     already_filled_apts.append(apt_num)
                 else:
-                    exceptions_idx.append(idx) # התא מכיל משהו אחר שלא ברור
+                    exceptions_idx.append(idx) 
             else:
-                exceptions_idx.append(idx) # סכום שונה מ-350
+                exceptions_idx.append(idx) 
 
-    amount_exceptions_df = identified_df.loc[exceptions_idx]
+    amount_exceptions_df = identified_df.loc[exceptions_idx].copy()
 
-    # יצירת לשונית גיבוי
+    # ==========================================
+    # יצירת ושמירת קובץ ה-CSV של החריגים
+    # ==========================================
+    # נוסיף עמודה שמסבירה מה סוג החריגה כדי שיהיה קל לסנן בדאשבורד
+    unidentified_save = unidentified_df.copy()
+    if not unidentified_save.empty:
+        unidentified_save['Exception_Reason'] = 'דירה לא זוהתה'
+        
+    amount_exceptions_save = amount_exceptions_df.copy()
+    if not amount_exceptions_save.empty:
+        amount_exceptions_save['Exception_Reason'] = 'סכום חריג / תא מלא'
+        
+    # איחוד כל החריגים לטבלה אחת
+    all_exceptions = pd.concat([unidentified_save, amount_exceptions_save], ignore_index=True)
+    
+    if not all_exceptions.empty:
+        # ניווט לתיקיית data/exceptions (בהנחה ש-master_path הוא בשורש הפרויקט)
+        project_root = os.path.dirname(master_path)
+        exceptions_dir = os.path.join(project_root, "data", "exceptions")
+        
+        # יצירת התיקייה אם היא לא קיימת
+        os.makedirs(exceptions_dir, exist_ok=True) 
+        
+        exceptions_file = os.path.join(exceptions_dir, f"exceptions_month_{month_num}.csv")
+        all_exceptions.to_csv(exceptions_file, index=False, encoding='utf-8-sig')
+        print(f"\n📁 קובץ חריגים נוצר ונשמר בהצלחה בנתיב: {exceptions_file}")
+
+
+    # יצירת לשונית גיבוי גולמית באקסל
     backup_name = f"פירוט_גביה_{month_num}"
     if backup_name in wb.sheetnames: del wb[backup_name] 
     ws_backup = wb.create_sheet(title=backup_name)
