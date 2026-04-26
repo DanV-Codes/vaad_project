@@ -3,13 +3,14 @@ import pandas as pd
 from ingestion import pick_and_copy_file
 from cleaning import load_bank_data
 from processing import process_bank_transactions, enrich_with_apartments
+from excel_integration import update_master_excel, update_expenses_in_excel
 
 if __name__ == "__main__":
     # 1. הגדרת התיקיות והנתיבים
     raw_directory = r"C:\Users\danie\PyProjects\vaad_project\data\raw"
     processed_directory = r"C:\Users\danie\PyProjects\vaad_project\data\processed"
     apartments_csv_path = r"C:\Users\danie\PyProjects\vaad_project\data\reference\apartments.csv"
-    categories_csv_path = r"C:\Users\danie\PyProjects\vaad_project\data\reference\categories.csv" # הנתיב החדש לקטגוריות!
+    categories_csv_path = r"C:\Users\danie\PyProjects\vaad_project\data\reference\categories.csv" 
     
     print("Starting Vaad Project Pipeline...")
     
@@ -22,7 +23,7 @@ if __name__ == "__main__":
             raw_df = load_bank_data(copied_file_path)
             print("✅ Module 1: Data loaded and cleaned.")
             
-            # שלב ג': עיבוד מתקדם (כולל קריאת קובץ הקטגוריות החדש!)
+            # שלב ג': עיבוד מתקדם (כולל קריאת קובץ הקטגוריות החדש)
             processed_df = process_bank_transactions(raw_df, categories_csv_path)
             print("✅ Module 2: Data processed and categorized using external rules.")
             
@@ -67,15 +68,17 @@ if __name__ == "__main__":
             print(f"💸 Debit file: {os.path.basename(debit_csv_path)} ({len(debit_df)} rows)")
             
             # --- שלב ח': עדכון קובץ המאסטר באקסל ---
-
-            # אנחנו הולכים שתי רמות למעלה מתיקיית ה-raw כדי להגיע לשורש הפרויקט
+            # הולכים שתי רמות למעלה מתיקיית ה-raw כדי להגיע לשורש הפרויקט
             project_root = os.path.dirname(os.path.dirname(raw_directory))
             master_excel_path = os.path.join(project_root, "האגמית7_כספים_2026.xlsx")
 
-            print(f"DEBUG: Looking for master file at: {master_excel_path}") # שורת בדיקה
-
-            from excel_integration import update_master_excel
+            print(f"\nDEBUG: Looking for master file at: {master_excel_path}")
+            
+            print("\n🔄 מתחיל עדכון הכנסות (גביית דיירים)...")
             update_master_excel(credit_df, master_excel_path) 
+            
+            print("\n🔄 מתחיל עדכון הוצאות (ספקים)...")
+            update_expenses_in_excel(debit_df, master_excel_path)
 
         except Exception as e:
             print(f"\n❌ An unexpected error occurred in main pipeline: {e}")
