@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import openpyxl
+import datetime
 
 # הגדרות עמוד
 st.set_page_config(page_title='ניהול ועד - האגמית 7', layout='wide', page_icon='🏢')
@@ -34,7 +35,6 @@ def load_collection_data():
 
 def load_expenses_data():
     try:
-        # קריאת עמודה A (ספקים) ועמודות B-M (חודשים)
         df = pd.read_excel(MASTER_FILE, sheet_name=EXPENSES_SHEET, usecols='A:M')
         df.columns = ['ספק'] + MONTHS_HEB
         for month in MONTHS_HEB:
@@ -69,20 +69,16 @@ def save_expenses_to_excel(updated_df):
     try:
         wb = openpyxl.load_workbook(MASTER_FILE)
         ws = wb[EXPENSES_SHEET]
-        # עמודה A היא 1, עמודות B-M הן 2-13
         for index, row in updated_df.iterrows():
             supplier_name = row['ספק']
             target_row = None
-            # מחפשים את הספק בעמודה A
             for r in range(2, 50): 
                 if ws.cell(row=r, column=1).value == supplier_name:
                     target_row = r
                     break
-            
             if target_row:
                 for i, month in enumerate(MONTHS_HEB):
                     ws.cell(row=target_row, column=2 + i).value = row[month]
-        
         wb.save(MASTER_FILE)
         return True
     except Exception as e:
@@ -97,7 +93,8 @@ if 'expenses_df' not in st.session_state:
 
 # --- תפריט צדדי ---
 st.sidebar.header('⚙️ הגדרות')
-selected_month_name = st.sidebar.selectbox('בחר חודש לעבודה:', MONTHS_HEB, index=2)
+current_month_index = datetime.datetime.now().month - 1
+selected_month_name = st.sidebar.selectbox('בחר חודש לעבודה:', MONTHS_HEB, index=current_month_index)
 selected_month_idx = MONTHS_HEB.index(selected_month_name)
 
 # יצירת הטאבים
@@ -110,7 +107,9 @@ with tab_collection:
         
         # 1. ווטסאפ
         st.subheader('📱 הודעה מוכנה לווטסאפ')
-        report_months = st.multiselect('כלול בהודעה:', MONTHS_HEB, default=[selected_month_name], key='ws_months')
+        default_months_for_report = MONTHS_HEB[:current_month_index + 1]
+        report_months = st.multiselect('כלול בהודעה:', MONTHS_HEB, default=default_months_for_report, key='ws_months')
+        
         debt_lines = []
         for _, row in paying_df.iterrows():
             apt_debts = []
@@ -118,8 +117,13 @@ with tab_collection:
                 if row[month] < DEBT_LIMIT:
                     apt_debts.append(f'{month} (חוב {int(DEBT_LIMIT - row[month])})')
             if apt_debts:
-                debt_lines.append(f"• דירה {int(row['דירה'])} - {', '.join(apt_debts)}")
-        st.text_area('העתק מכאן:', value="היי, להלן רשימת החובות:\n" + "\n".join(debt_lines), height=120)
+                # הסרנו את הנקודה (•) בתחילת השורה
+                debt_lines.append(f"דירה {int(row['דירה'])} - {', '.join(apt_debts)}")
+        
+        whatsapp_message = "היי, להלן רשימת החובות:\n\n" + "\n".join(debt_lines)
+        
+        # שימוש ב-st.code בשביל כפתור ההעתקה המובנה
+        st.code(whatsapp_message, language='text')
 
         # 2. חריגים
         st.markdown('---')
@@ -163,12 +167,9 @@ with tab_expenses:
     if st.session_state.expenses_df is not None:
         st.subheader(f'💸 הוצאות ספקים - שנת 2026')
         
-        # סיכום לחודש הנבחר
         current_month_total = st.session_state.expenses_df[selected_month_name].sum()
         st.metric(label=f"סה״כ הוצאות ל{selected_month_name}", value=f"₪{current_month_total:,.2f}")
         
-        # עריכת טבלת הוצאות
-        # מסדרים את העמודות: ספק ואז חודשים (מהאחרון לראשון או לפי הסדר)
         exp_display_cols = ['ספק'] + MONTHS_HEB
         
         edited_expenses = st.data_editor(
@@ -185,7 +186,6 @@ with tab_expenses:
                 st.session_state.expenses_df = load_expenses_data()
                 st.rerun()
         
-        # גרף קטן של הוצאות לאורך השנה
         st.markdown('---')
         st.subheader('📈 מגמת הוצאות חודשית')
         monthly_totals = st.session_state.expenses_df[MONTHS_HEB].sum()
