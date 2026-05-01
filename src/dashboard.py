@@ -18,7 +18,12 @@ MASTER_FILE = 'האגמית7_כספים_2026.xlsx'
 
 def load_data(sheet_name):
     try:
-        return pd.read_excel(MASTER_FILE, sheet_name=sheet_name)
+        if sheet_name == 'גביה 2026':
+            # טוען במפורש את עמודות B עד P (כולל דירה, שם משפחה, קופה קטנה וכל החודשים) 
+            # ומגביל ל-60 שורות כדי למנוע כניסת שורות "סה"כ" מהאקסל שגורמות לשגיאה
+            return pd.read_excel(MASTER_FILE, sheet_name=sheet_name, usecols='B:P', nrows=60)
+        else:
+            return pd.read_excel(MASTER_FILE, sheet_name=sheet_name)
     except Exception as e:
         st.error(f"שגיאה בטעינת הקובץ: {e}")
         return None
